@@ -2,21 +2,27 @@
 
 declare(strict_types=1);
 
+namespace Daemon;
 
-namespace App;
-
+use Daemon\Runtime\PidStorage;
 
 class Application
 {
     private const LOG_PATH = __DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'var' . DIRECTORY_SEPARATOR . 'log.log';
-    private const PID_PATH = __DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'var' . DIRECTORY_SEPARATOR . 'd.pid';
 
     private bool $logRedirected = false;
+
+    private PidStorage $pidStorage;
 
     /**
      * @var resource
      */
     private $logFile;
+
+    public function __construct(PidStorage $pid)
+    {
+        $this->pidStorage = $pid;
+    }
 
     public function run(array $argv, int $argc): int
     {
@@ -26,7 +32,7 @@ class Application
             return ExitCodeEnum::NOT_OK;
         }
 
-        $pid = file_exists(self::PID_PATH) ? file_get_contents(self::PID_PATH) : false;
+        $pid = $this->pidStorage->readPid();
 
         if ($argv[1] === 'stop') {
             if (empty($pid)) {
@@ -48,10 +54,10 @@ class Application
         if ($code === -1) {
             echo 'Что-то пошло не так' . PHP_EOL;
             return ExitCodeEnum::NOT_OK;
-        } else if ($code > 0) {
-            $handler = fopen(self::PID_PATH, 'wb+');
-            fwrite($handler, (string)$code);
-            fclose($handler);
+        }
+
+        if ($code > 0) {
+            $this->pidStorage->writePid($code);
             echo 'Успещно !' . PHP_EOL;
             return ExitCodeEnum::OK;
         }
